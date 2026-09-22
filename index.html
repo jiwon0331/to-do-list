@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Todo</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <header id="app-header" class="app-header">
+    <h1>Daily Todo<span class="brand-dot" aria-hidden="true">.</span></h1>
+    <p>오늘 해야 할 일을 관리하세요.</p>
+  </header>
+  <main id="app-main" class="app-main">
+    <p id="storage-message" class="storage-message" role="status" hidden></p>
+    <section id="progress-section" class="progress-section" aria-labelledby="progress-title">
+      <h2 id="progress-title">선택한 날짜의 진행률</h2>
+      <p id="progress-count" class="progress-count" aria-live="polite" aria-atomic="true"><strong id="completed-count">0</strong>/<span id="total-count">0</span> 완료 (<span id="progress-percent">0%</span>)</p>
+      <div id="todo-progress" class="todo-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="progress-title" aria-describedby="progress-count">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+    </section>
+    <section class="calendar-section" aria-labelledby="calendar-title">
+      <h2 id="calendar-title">캘린더</h2>
+      <div class="calendar-navigation">
+        <button id="calendar-prev" class="todo-action" type="button" aria-label="이전 달">‹ 이전</button>
+        <h3 id="calendar-month" aria-live="polite"></h3>
+        <button id="calendar-next" class="todo-action" type="button" aria-label="다음 달">다음 ›</button>
+      </div>
+      <div class="calendar-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+      <div id="calendar-days" class="calendar-days" role="group" aria-labelledby="calendar-month"></div>
+    </section>
+    <section id="add-todo-section" class="add-todo-section" aria-labelledby="add-todo-title">
+      <h2 id="add-todo-title">할 일 추가</h2>
+      <form id="add-todo-form" class="add-todo-form">
+        <div class="form-field">
+          <label for="todo-input">할 일</label>
+          <input id="todo-input" name="todo" type="text" placeholder="어떤 일을 해야 하나요?" autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="todo-category">카테고리</label>
+          <select id="todo-category" name="category">
+          </select>
+        </div>
+        <div class="form-field date-field">
+          <label for="todo-date">날짜</label>
+          <input id="todo-date" type="date" min="0001-01-01" max="9999-12-31" required>
+        </div>
+        <button id="add-todo-button" class="add-todo-button" type="submit">추가</button>
+      </form>
+      <p id="category-empty-message" class="category-empty-message" role="status" hidden>사용 가능한 카테고리가 없습니다. 먼저 카테고리를 추가해주세요.</p>
+    </section>
+    <section id="todo-list-section" class="todo-list-section" aria-labelledby="todo-list-title">
+      <h2 id="todo-list-title">할 일 목록</h2>
+      <div id="category-filters" class="category-filters" role="group" aria-label="Todo 카테고리 필터"></div>
+      <p id="todo-empty-message" class="todo-empty-message">이 날짜에 등록된 할 일이 없습니다.</p>
+      <ul id="todo-list" class="todo-list"></ul>
+    </section>
+    <section id="category-section" class="category-section" aria-labelledby="category-title">
+      <h2 id="category-title">카테고리 관리</h2>
+      <ul id="category-list" class="category-list"></ul>
+      <p id="category-list-empty" hidden>등록된 카테고리가 없습니다.</p>
+      <form id="add-category-form" class="category-add-form">
+        <div class="form-field">
+          <label for="category-name-input">새 카테고리</label>
+          <input id="category-name-input" type="text" placeholder="카테고리 이름" autocomplete="off">
+        </div>
+        <button id="add-category-button" class="add-todo-button" type="submit">추가</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
+
