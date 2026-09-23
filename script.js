@@ -24,7 +24,107 @@
   const todoInput = document.getElementById("todo-input");
   const categoryInput = document.getElementById("todo-category");
   const todoList = document.getElementById("todo-list");
+  let manualCategoryId = null;
+  const CLASSIFICATION_KEY = "daily-todo.classification.v1";
+  const classificationSettings = { enabled: true, showSuggestions: true };
+  const categoryRules = [
+    { id: "work", names: ["업무", "회사", "직장", "work"], keywords: ["회의", "보고서", "기획", "결재", "고객", "견적", "출장", "업무", "프로젝트"] },
+    { id: "personal", names: ["개인", "생활", "personal"], keywords: ["장보기", "청소", "세탁", "병원", "약속", "가족", "공과금", "예약", "은행"] },
+    { id: "study", names: ["공부", "학습", "study"], keywords: ["공부", "강의", "시험", "과제", "복습", "예습", "영어", "독서", "자격증"] },
+    { names: ["취업", "구직"], keywords: ["자기소개서", "이력서", "면접", "입사지원", "채용", "포트폴리오"] },
+    { names: ["운동", "건강"], keywords: ["운동", "헬스", "러닝", "조깅", "수영", "요가", "스트레칭"] },
+    { names: ["여행"], keywords: ["여행", "항공권", "숙소", "호텔", "여권", "여행짐"] }
+  ];
+
+  function getCategoryKeywords(category) {
+    const name = category.name.trim().toLocaleLowerCase();
+    const keywords = new Set([name]);
+    for (const rule of categoryRules) {
+      if (rule.id === category.id || rule.names.includes(name)) {
+        rule.names.forEach(alias => keywords.add(alias));
+        rule.keywords.forEach(keyword => keywords.add(keyword));
+      }
+    }
+    return [...keywords];
+  }
+
+  function suggestCategory(text) {
+    const normalized = text.trim().toLocaleLowerCase();
+    if (!normalized) return null;
+    const matches = categories.map(category => {
+      const score = getCategoryKeywords(category).filter(keyword => {
+        // 영문 키워드는 homework와 work 같은 부분 단어 오분류를 피합니다.
+        if (/^[a-z0-9 ]+$/.test(keyword)) {
+          return normalized.split(/[^a-z0-9]+/).join(" ").split(" ").includes(keyword);
+        }
+        return normalized.includes(keyword);
+      }).length;
+      return { category, score };
+    }).sort((a, b) => b.score - a.score);
+    // 여러 카테고리가 같은 점수면 임의로 선택하지 않습니다.
+    if (!matches[0]?.score || matches[0].score === matches[1]?.score) return null;
+    return matches[0].category;
+  }
+
+  function updateCategorySuggestion() {
+    const hint = document.getElementById("category-suggestion");
+    hint.hidden = !classificationSettings.showSuggestions;
+    if (manualCategoryId && !getCategory(manualCategoryId)) manualCategoryId = null;
+    if (!categories.length || !todoInput.value.trim()) {
+      hint.textContent = classificationSettings.enabled
+        ? "내용의 키워드로 카테고리를 자동 선택합니다. 직접 변경할 수 있습니다."
+        : "자동 분류가 꺼져 있습니다. 카테고리를 직접 선택하세요.";
+      return;
+    }
+    if (manualCategoryId) {
+      hint.textContent = `직접 선택한 '${getCategory(manualCategoryId).name}' 카테고리를 사용합니다.`;
+      return;
+    }
+    const suggestion = suggestCategory(todoInput.value);
+    if (suggestion) {
+      if (classificationSettings.enabled) categoryInput.value = suggestion.id;
+      hint.textContent = classificationSettings.enabled
+        ? `키워드에 따라 '${suggestion.name}' 카테고리를 자동 선택했습니다.`
+        : `추천 카테고리: '${suggestion.name}'. 자동 분류가 꺼져 있어 직접 선택해야 합니다.`;
+    } else {
+      hint.textContent = "일치하는 분류가 없거나 여러 분류가 비슷합니다. 현재 카테고리를 확인해주세요.";
+    }
+  }
+
+  function loadClassificationSettings() {
+    try {
+      const raw = localStorage.getItem(CLASSIFICATION_KEY);
+      if (raw === null) return;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved.enabled !== "boolean" || typeof saved.showSuggestions !== "boolean") throw new Error();
+      Object.assign(classificationSettings, { enabled: saved.enabled, showSuggestions: saved.showSuggestions });
+    } catch {
+      document.getElementById("classification-status").textContent = "설정을 읽지 못해 기본값(ON)을 사용합니다.";
+    }
+  }
+
+  function saveClassificationSettings() {
+    try {
+      localStorage.setItem(CLASSIFICATION_KEY, JSON.stringify(classificationSettings));
+      document.getElementById("classification-status").textContent = "설정을 저장했습니다.";
+    } catch {
+      document.getElementById("classification-status").textContent = "설정을 저장하지 못했습니다. 현재 페이지에서만 적용됩니다.";
+    }
+  }
+
+  function renderKeywordPreview() {
+    const list = document.getElementById("keyword-preview");
+    list.replaceChildren();
+    for (const category of categories) {
+      const item = makeElement("li", "");
+      item.append(makeElement("strong", "", `${category.name}: `),
+        makeElement("span", "", getCategoryKeywords(category).join(", ")));
+      list.append(item);
+    }
+    if (!categories.length) list.append(makeElement("li", "", "사용 가능한 카테고리가 없습니다."));
+  }
   const dateInput = document.getElementById("todo-date");
+  const dueDateInput = document.getElementById("todo-due-date");
   let selectedDate = localDateString(new Date());
   let calendarYear = Number(selectedDate.slice(0, 4));
   let calendarMonth = Number(selectedDate.slice(5, 7)) - 1;
@@ -43,7 +143,34 @@
   }
 
   function getTodosByDate(date) {
-    return todos.filter(todo => todo.date === date);
+    return todos.filter(todo => isTodoVisibleOnDate(todo, date));
+  }
+
+  function isTodoVisibleOnDate(todo, date) {
+    return todo.dueDate ? todo.date <= date && date <= todo.dueDate : todo.date === date;
+  }
+
+  function validateDueDate(input, startDate) {
+    const valid = !input.value || (isValidDate(input.value) && input.value >= startDate);
+    input.setCustomValidity(valid ? "" : "D-day는 시작 날짜와 같거나 이후인 날짜를 선택하세요.");
+    if (!valid) input.reportValidity();
+    return valid;
+  }
+
+  // 달력 날짜를 정수 일수로 계산해 시간대와 서머타임의 영향을 피합니다.
+  function calendarDayNumber(value) {
+    let [year, month, day] = value.split("-").map(Number);
+    if (month <= 2) year--;
+    const era = Math.floor(year / 400);
+    const y = year - era * 400;
+    const m = month + (month > 2 ? -3 : 9);
+    return era * 146097 + y * 365 + Math.floor(y / 4) - Math.floor(y / 100) +
+      Math.floor((153 * m + 2) / 5) + day - 1;
+  }
+
+  function getDdayLabel(dueDate, date = selectedDate) {
+    const remaining = calendarDayNumber(dueDate) - calendarDayNumber(date);
+    return remaining === 0 ? "D-DAY" : `D-${remaining}`;
   }
 
   function getFilteredTodos() {
@@ -88,6 +215,21 @@
     updateProgress();
   }
 
+  // 편집 입력의 blur 저장 중 날짜 버튼을 교체하면 이어지는 클릭이 사라질 수 있습니다.
+  // D-day 변경 시에는 기존 날짜 버튼을 유지하고 개수만 갱신합니다.
+  function updateCalendarCounts() {
+    const today = localDateString(new Date());
+    for (const button of document.getElementById("calendar-days").querySelectorAll(".calendar-day")) {
+      const date = button.id.slice("calendar-".length);
+      const count = getTodosByDate(date).length;
+      button.setAttribute("aria-label", `${date}, 할 일 ${count}개${date === today ? ", 오늘" : ""}`);
+      const badge = button.querySelector(".calendar-count");
+      if (!count) badge?.remove();
+      else if (badge) badge.textContent = `•${count}`;
+      else button.append(makeElement("span", "calendar-count", `•${count}`));
+    }
+  }
+
   function changeMonth(offset) {
     const monthIndex = calendarYear * 12 + calendarMonth + offset;
     const year = Math.floor(monthIndex / 12);
@@ -105,8 +247,6 @@
     first.setFullYear(calendarYear);
     const last = new Date(first);
     last.setMonth(last.getMonth() + 1, 0);
-    const counts = new Map();
-    for (const todo of todos) counts.set(todo.date, (counts.get(todo.date) || 0) + 1);
     const today = localDateString(new Date());
     for (let i = 0; i < first.getDay(); i++) {
       const blank = makeElement("span", "calendar-blank");
@@ -115,7 +255,7 @@
     }
     for (let day = 1; day <= last.getDate(); day++) {
       const date = `${String(calendarYear).padStart(4, "0")}-${String(calendarMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const count = counts.get(date) || 0;
+      const count = getTodosByDate(date).length;
       const button = makeButton(String(day), () => {
         selectDate(date);
         document.getElementById(`calendar-${date}`).focus();
@@ -170,7 +310,8 @@
         }
         ids.add(category.id);
       }
-      categories.push(...saved.map(({ id, name }) => ({ id, name })));
+      // 기존 버전이 저장한 추가 속성도 다음 저장 때 유실되지 않게 보존합니다.
+      categories.push(...saved.map(category => ({ ...category })));
       // []는 사용자가 모두 삭제한 상태이며 기본값으로 대체하지 않습니다.
     } catch {
       categoriesWritable = false;
@@ -213,12 +354,15 @@
         ids.add(todo.id);
         // 존재하지 않는 카테고리 참조도 보존하여 Todo 손실을 방지합니다.
         const { category, ...rest } = todo;
-        return { ...rest, categoryId, date: isValidDate(todo.date) ? todo.date : localDateString(new Date()) };
+        const date = isValidDate(todo.date) ? todo.date : localDateString(new Date());
+        const dueDate = isValidDate(todo.dueDate) && todo.dueDate >= date ? todo.dueDate : null;
+        return { ...rest, categoryId, date, dueDate };
       });
       todos.push(...converted);
       for (const todo of todos) nextId = Math.max(nextId, todo.id + 1);
-      const needsMigration = current === null || saved.some(todo =>
-        Object.hasOwn(todo, "category") || !Object.hasOwn(todo, "categoryId") || !isValidDate(todo.date));
+      const needsMigration = current === null || saved.some((todo, index) =>
+        Object.hasOwn(todo, "category") || !Object.hasOwn(todo, "categoryId") || !isValidDate(todo.date) ||
+        !Object.hasOwn(todo, "dueDate") || todo.dueDate !== converted[index].dueDate);
       if (needsMigration) saveTodos();
       // 이전 키는 백업으로 남깁니다. 새 키가 []여도 이전 데이터를 복원하지 않습니다.
     } catch {
@@ -262,6 +406,8 @@
     document.getElementById("category-empty-message").hidden = categories.length > 0;
     renderCategoryList();
     renderCategoryFilters();
+    updateCategorySuggestion();
+    renderKeywordPreview();
   }
 
   function validateCategoryName(input, excludedId = null) {
@@ -370,7 +516,7 @@
       } else {
         const name = makeElement("span", "category-name", category.name);
         const actions = makeElement("div", "todo-actions");
-        const edit = makeButton("✎", () => {
+        const edit = makeButton("✏", () => {
           editingCategoryId = category.id;
           renderCategoryList();
           const input = document.getElementById("category-edit-input");
@@ -404,8 +550,8 @@
   function commitTodos() {
     saveTodos();
     renderTodos();
-    updateProgress();
     renderCalendar();
+    updateProgress();
   }
   
   function validateText(input) {
@@ -416,10 +562,12 @@
   }
   
   function addTodo() {
+    updateCategorySuggestion();
     const text = validateText(todoInput);
     if (!text || !getCategory(categoryInput.value)) return;
     dateInput.setCustomValidity(isValidDate(dateInput.value) ? "" : "올바른 날짜를 선택하세요.");
     if (!isValidDate(dateInput.value)) { dateInput.reportValidity(); return; }
+    if (!validateDueDate(dueDateInput, dateInput.value)) return;
     if (editingId !== null) saveEditedTodo(editingId, true);
     // 매우 큰 저장 id를 읽은 경우에도 안전한 정수와 고유성을 유지합니다.
     if (nextId >= Number.MAX_SAFE_INTEGER) nextId = 1;
@@ -430,10 +578,14 @@
       text,
       categoryId: categoryInput.value,
       date: dateInput.value,
+      dueDate: dueDateInput.value || null,
       completed: false,
       createdAt: now.toISOString()
     });
     todoInput.value = "";
+    dueDateInput.value = "";
+    manualCategoryId = null;
+    updateCategorySuggestion();
     // 별도 날짜로 추가한 항목도 바로 확인할 수 있도록 선택 날짜를 맞춥니다.
     selectedDate = dateInput.value;
     calendarYear = Number(selectedDate.slice(0, 4));
@@ -463,17 +615,25 @@
       else validateText(input);
       return;
     }
+    const dueInput = document.getElementById(`edit-due-${id}`);
+    if (!validateDueDate(dueInput, todo.date)) {
+      if (revertEmpty) cancelEditingTodo(id, restoreFocus);
+      return;
+    }
+    const dueChanged = todo.dueDate !== (dueInput.value || null);
+    todo.dueDate = dueInput.value || null;
     todo.text = text;
     const selectedId = document.getElementById(`edit-category-${id}`).value;
     if (getCategory(selectedId)) todo.categoryId = selectedId;
     saveTodos();
     editingId = null;
-    if (selectedCategoryId !== null && todo.categoryId !== selectedCategoryId) {
+    if (!isTodoVisibleOnDate(todo, selectedDate) || (selectedCategoryId !== null && todo.categoryId !== selectedCategoryId)) {
       document.getElementById(`todo-row-${id}`)?.remove();
       updateEmptyState();
     } else {
       replaceTodoRow(id);
     }
+    if (dueChanged) { updateCalendarCounts(); updateProgress(); }
     if (restoreFocus) (document.getElementById(`edit-button-${id}`) || todoInput).focus();
   }
 
@@ -549,11 +709,21 @@
       select.id = `edit-category-${todo.id}`;
       select.setAttribute("aria-label", "카테고리 수정");
       fillCategoryOptions(select, todo.categoryId);
+      const dueLabel = makeElement("label", "todo-due-field", "D-day (선택)");
+      const dueInput = makeElement("input", "");
+      dueInput.id = `edit-due-${todo.id}`;
+      dueInput.type = "date";
+      dueInput.min = todo.date;
+      dueInput.max = "9999-12-31";
+      dueInput.value = todo.dueDate || "";
+      dueInput.addEventListener("input", () => dueInput.setCustomValidity(""));
+      dueLabel.append(dueInput);
       actions.append(
         makeButton("저장", () => saveEditedTodo(todo.id, false, true)),
         makeButton("취소", () => cancelEditingTodo(todo.id))
       );
-      item.append(checkbox, input, select, actions);
+      item.className += " is-editing";
+      item.append(checkbox, input, select, dueLabel, actions);
       item.addEventListener("keydown", event => {
         // 한글 조합 확정 Enter가 저장으로 처리되지 않게 합니다.
         if (event.isComposing || event.keyCode === 229) return;
@@ -584,7 +754,15 @@
       remove.id = `delete-button-${todo.id}`;
       remove.setAttribute("aria-label", `${todo.text} 삭제`);
       actions.append(edit, remove);
-      item.append(checkbox, text, badge, actions);
+      const metadata = makeElement("div", "todo-metadata");
+      metadata.append(badge);
+      if (todo.dueDate) {
+        const dueBadge = makeElement("span", "due-badge", getDdayLabel(todo.dueDate));
+        dueBadge.title = `D-day: ${todo.dueDate}`;
+        dueBadge.setAttribute("aria-label", `${todo.dueDate} 마감, ${getDdayLabel(todo.dueDate)}`);
+        metadata.append(dueBadge);
+      }
+      item.append(checkbox, text, metadata, actions);
     }
     return item;
   }
@@ -593,12 +771,14 @@
     const input = editingId === null ? null : document.getElementById(`edit-text-${editingId}`);
     const draft = input ? {
       text: input.value,
-      category: document.getElementById(`edit-category-${editingId}`).value
+      category: document.getElementById(`edit-category-${editingId}`).value,
+      dueDate: document.getElementById(`edit-due-${editingId}`).value
     } : null;
     const visibleTodos = getFilteredTodos();
     todoList.replaceChildren(...visibleTodos.map(createTodoRow));
     if (draft) {
       document.getElementById(`edit-text-${editingId}`).value = draft.text;
+      document.getElementById(`edit-due-${editingId}`).value = draft.dueDate;
       const todo = todos.find(item => item.id === editingId);
       document.getElementById(`edit-category-${editingId}`).value =
         getCategory(draft.category) ? draft.category : todo.categoryId;
@@ -634,8 +814,18 @@
     event.preventDefault();
     addTodo();
   });
-  todoInput.addEventListener("input", () => todoInput.setCustomValidity(""));
+  todoInput.addEventListener("input", () => {
+    todoInput.setCustomValidity("");
+    if (!todoInput.value.trim()) manualCategoryId = null;
+    updateCategorySuggestion();
+  });
+  categoryInput.addEventListener("change", () => {
+    manualCategoryId = categoryInput.value;
+    updateCategorySuggestion();
+  });
   dateInput.addEventListener("input", () => dateInput.setCustomValidity(""));
+  dueDateInput.addEventListener("input", () => dueDateInput.setCustomValidity(""));
+  dateInput.addEventListener("input", () => dueDateInput.setCustomValidity(""));
   document.getElementById("calendar-prev").addEventListener("click", () => changeMonth(-1));
   document.getElementById("calendar-next").addEventListener("click", () => changeMonth(1));
   document.getElementById("add-category-form").addEventListener("submit", event => {
@@ -643,6 +833,21 @@
     addCategory();
   });
   document.getElementById("category-name-input").addEventListener("input", event => event.target.setCustomValidity(""));
+  loadClassificationSettings();
+  const autoToggle = document.getElementById("classification-enabled");
+  const suggestionToggle = document.getElementById("classification-suggestions");
+  autoToggle.checked = classificationSettings.enabled;
+  suggestionToggle.checked = classificationSettings.showSuggestions;
+  autoToggle.addEventListener("change", () => {
+    classificationSettings.enabled = autoToggle.checked;
+    saveClassificationSettings();
+    updateCategorySuggestion();
+  });
+  suggestionToggle.addEventListener("change", () => {
+    classificationSettings.showSuggestions = suggestionToggle.checked;
+    saveClassificationSettings();
+    updateCategorySuggestion();
+  });
   loadCategories();
   loadTodos();
   renderCategories();
