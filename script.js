@@ -856,6 +856,3 @@
   renderTodos();
   updateProgress();
 })();
-
-
-
