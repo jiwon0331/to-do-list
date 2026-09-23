@@ -31,8 +31,21 @@
       <div class="calendar-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
       <div id="calendar-days" class="calendar-days" role="group" aria-labelledby="calendar-month"></div>
     </section>
-    <section id="add-todo-section" class="add-todo-section" aria-labelledby="add-todo-title">
-      <h2 id="add-todo-title">할 일 추가</h2>
+    <section id="add-todo-section" class="todo-section add-todo-section" aria-labelledby="add-todo-title">
+      <div class="todo-section-header">
+        <h2 id="add-todo-title">할 일 추가</h2>
+        <details class="classification-settings">
+          <summary>자동 분류 설정 및 키워드</summary>
+          <label class="setting-toggle"><input id="classification-enabled" type="checkbox" checked> 자동 분류 ON/OFF</label>
+          <label class="setting-toggle"><input id="classification-suggestions" type="checkbox" checked> 분류 제안 표시 ON/OFF</label>
+          <p>직접 선택한 카테고리는 우선 유지합니다. 동점·미일치 시 자동 선택하지 않습니다. 기존 할 일은 변경하지 않습니다.</p>
+          <p id="classification-status" role="status"></p>
+          <details class="keyword-details">
+            <summary>카테고리별 키워드 미리보기</summary>
+            <ul id="keyword-preview"></ul>
+          </details>
+        </details>
+      </div>
       <form id="add-todo-form" class="add-todo-form">
         <div class="form-field">
           <label for="todo-input">할 일</label>
@@ -40,22 +53,27 @@
         </div>
         <div class="form-field">
           <label for="todo-category">카테고리</label>
-          <select id="todo-category" name="category">
+          <select id="todo-category" name="category" aria-describedby="category-suggestion">
           </select>
         </div>
         <div class="form-field date-field">
-          <label for="todo-date">날짜</label>
+          <label for="todo-date">시작 날짜</label>
           <input id="todo-date" type="date" min="0001-01-01" max="9999-12-31" required>
+        </div>
+        <div class="form-field">
+          <label for="todo-due-date">D-day (선택)</label>
+          <input id="todo-due-date" type="date" min="0001-01-01" max="9999-12-31">
         </div>
         <button id="add-todo-button" class="add-todo-button" type="submit">추가</button>
       </form>
+      <p id="category-suggestion" class="category-suggestion" role="status">내용의 키워드로 카테고리를 자동 선택합니다. 직접 변경할 수 있습니다.</p>
       <p id="category-empty-message" class="category-empty-message" role="status" hidden>사용 가능한 카테고리가 없습니다. 먼저 카테고리를 추가해주세요.</p>
-    </section>
-    <section id="todo-list-section" class="todo-list-section" aria-labelledby="todo-list-title">
-      <h2 id="todo-list-title">할 일 목록</h2>
-      <div id="category-filters" class="category-filters" role="group" aria-label="Todo 카테고리 필터"></div>
-      <p id="todo-empty-message" class="todo-empty-message">이 날짜에 등록된 할 일이 없습니다.</p>
-      <ul id="todo-list" class="todo-list"></ul>
+      <div id="todo-list-section" class="todo-list-area" role="region" aria-labelledby="todo-list-title">
+        <h2 id="todo-list-title">할 일 목록</h2>
+        <div id="category-filters" class="category-filters" role="group" aria-label="Todo 카테고리 필터"></div>
+        <p id="todo-empty-message" class="todo-empty-message">이 날짜에 등록된 할 일이 없습니다.</p>
+        <ul id="todo-list" class="todo-list"></ul>
+      </div>
     </section>
     <section id="category-section" class="category-section" aria-labelledby="category-title">
       <h2 id="category-title">카테고리 관리</h2>
@@ -72,4 +90,5 @@
   </main>
 </body>
 </html>
+
 
