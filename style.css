@@ -108,6 +108,7 @@ button { cursor: pointer; }
 .category-badge--study { color: #71519a; background: #f3edfa; }
 .category-badge--custom { color: #276346; background: #edf5ef; }
 .category-empty-message { margin-top: 12px; font-size: 0.875rem; }
+.category-suggestion { margin-top: 10px; font-size: 0.8125rem; overflow-wrap: anywhere; }
 .category-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 12px 0; padding: 0; list-style: none; }
 .category-item { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 4px 6px 4px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--page); }
 .category-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -168,4 +169,33 @@ input[type="date"] { width: 100%; min-width: 0; min-height: 46px; padding: 10px 
   .add-todo-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .add-todo-form .form-field:first-child { grid-column: 1 / -1; }
   .add-todo-button { min-width: 0; }
+}
+.todo-section-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px; }
+.todo-section-header > h2 { padding-top: 6px; flex-shrink: 0; }
+.classification-settings { min-width: 0; max-width: 100%; width: 340px; margin: 0; font-size: 0.875rem; overflow-wrap: anywhere; }
+.classification-settings > summary { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); }
+.classification-settings[open] { padding-bottom: 12px; }
+.todo-list-area { min-width: 0; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+@media (max-width: 600px) {
+  .classification-settings { width: 100%; }
+  .todo-section-header { gap: 10px; }
+}
+.classification-settings summary { cursor: pointer; color: var(--text); }
+.setting-toggle { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.setting-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+.keyword-details { margin-top: 12px; }
+#keyword-preview { padding-left: 20px; overflow-wrap: anywhere; }
+#keyword-preview li { margin: 8px 0; }
+.classification-settings summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* 선택형 D-day */
+.add-todo-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.add-todo-form .form-field:first-child { grid-column: 1 / -1; }
+.todo-metadata { display: flex; flex-wrap: wrap; gap: 6px; max-width: 180px; min-width: 0; }
+.due-badge { padding: 3px 8px; border-radius: 999px; background: #fff3dc; color: #775010; font-size: 0.75rem; white-space: nowrap; }
+.todo-item.is-editing { flex-wrap: wrap; }
+.todo-due-field { flex: 0 1 170px; min-width: 0; margin: 0; }
+@media (max-width: 600px) {
+  .add-todo-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .todo-metadata { margin-left: 32px; max-width: calc(100% - 32px); }
+  .todo-metadata .category-badge { margin-left: 0; }
 }
